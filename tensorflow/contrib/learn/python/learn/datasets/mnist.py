@@ -108,7 +108,9 @@ class DataSet(object):
                fake_data=False,
                one_hot=False,
                dtype=dtypes.float32,
-               reshape=True):
+               reshape=True,
+               permute = 'none',
+               seed = 1234):
     """Construct a DataSet.
     one_hot arg is used only if fake_data is true.  `dtype` can be either
     `uint8` to leave the input as `[0, 255]`, or `float32` to rescale into
@@ -125,6 +127,20 @@ class DataSet(object):
       assert images.shape[0] == labels.shape[0], (
           'images.shape: %s labels.shape: %s' % (images.shape, labels.shape))
       self._num_examples = images.shape[0]
+      
+      # Randomly permute the pixel intensities
+      if permute is 'row':
+        numpy.random.seed(seed)
+        images.flags.writeable = True
+        for i in range(len(images)):
+          numpy.random.shuffle(images[i])
+      
+      if permute is 'col':
+        numpy.random.seed(seed)
+        images.flags.writeable = True
+        for i in range(len(images)):
+          numpy.random.shuffle(numpy.transpose(images[i].reshape(28,28)))
+          images[i].reshape(28,28,1)
 
       # Convert shape from [num examples, rows, columns, depth]
       # to [num examples, rows*columns] (assuming depth == 1)
@@ -132,6 +148,19 @@ class DataSet(object):
         assert images.shape[3] == 1
         images = images.reshape(images.shape[0],
                                 images.shape[1] * images.shape[2])
+        if permute is 'all':
+          numpy.random.seed(seed)
+          images.flags.writeable = True
+          for i in range(len(images)):
+            numpy.random.shuffle(images[i])
+      else:
+        if permute is 'all':
+          numpy.random.seed(seed)
+          images.flags.writeable = True
+          for i in range(len(images)):
+            numpy.random.shuffle(images[i].reshape(784))
+            images[i].reshape(28,28,1)
+
       if dtype == dtypes.float32:
         # Convert from [0, 255] -> [0.0, 1.0].
         images = images.astype(numpy.float32)
@@ -191,7 +220,9 @@ def read_data_sets(train_dir,
                    one_hot=False,
                    dtype=dtypes.float32,
                    reshape=True,
-                   validation_size=5000):
+                   validation_size=5000,
+                   permute = 'none',
+                   seed = 1234):
   if fake_data:
 
     def fake():
@@ -237,11 +268,13 @@ def read_data_sets(train_dir,
   train_images = train_images[validation_size:]
   train_labels = train_labels[validation_size:]
 
-  train = DataSet(train_images, train_labels, dtype=dtype, reshape=reshape)
+  train = DataSet(train_images, train_labels, dtype=dtype, reshape=reshape, permute=permute, seed=seed)
   validation = DataSet(validation_images,
                        validation_labels,
                        dtype=dtype,
-                       reshape=reshape)
+                       reshape=reshape,
+                       permute=permute, 
+                       seed=seed)
   test = DataSet(test_images, test_labels, dtype=dtype, reshape=reshape)
 
   return base.Datasets(train=train, validation=validation, test=test)
